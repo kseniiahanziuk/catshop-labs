@@ -5,9 +5,13 @@ services:
       - "127.0.0.1:8080:8080"
     environment:
       DATABASE_URL: postgresql://shop:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/shop
+      PARTNER_URL: http://partner:8080
     depends_on:
       db:
         condition: service_healthy
+      partner:
+        condition: service_started
+    networks: [frontend, backend, partnernet]
 
   db:
     image: postgres:16-alpine
@@ -24,6 +28,21 @@ services:
       timeout: 3s
       retries: 10
       start_period: 10s
+    networks: [backend]
+
+  partner:
+    image: wiremock/wiremock:3.6.0
+    command: ["--verbose", "--disable-banner"]
+    volumes:
+      - ./partner/mappings:/home/wiremock/mappings:ro
+    networks: [partnernet]
 
 volumes:
   pgdata:
+
+networks:
+  frontend:
+  backend:
+    internal: true
+  partnernet:
+    internal: true
