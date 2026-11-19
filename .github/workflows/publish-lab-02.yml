@@ -2,7 +2,10 @@ name: publish-lab-02
 
 on:
   push:
-    paths: ["lab-02/**", ".github/workflows/publish-lab-02.yml"]
+    paths:
+      - "lab-02/**"
+      - "!lab-02/published.txt"
+      - ".github/workflows/publish-lab-02.yml"
 
 jobs:
   test:
@@ -32,9 +35,12 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+      - id: build
+        uses: docker/build-push-action@v6
         with:
           context: lab-02
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/catshop:${{ github.sha }}
           labels: org.opencontainers.image.revision=${{ github.sha }}
+      - name: Published reference
+        run: echo "ghcr.io/${{ github.repository_owner }}/catshop@${{ steps.build.outputs.digest }}" | tee -a "$GITHUB_STEP_SUMMARY"
