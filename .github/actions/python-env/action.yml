@@ -1,0 +1,29 @@
+name: python-env
+description: set up Python and install the given requirements files as steps of the calling job
+
+inputs:
+  python-version:
+    description: Python version for actions/setup-python
+    default: "3.12"
+  working-directory:
+    description: Folder the requirements paths are relative to
+    default: "."
+  requirements:
+    description: Space-separated requirements files to install
+    default: requirements.txt
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+    - name: Install requirements
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        REQUIREMENTS: ${{ inputs.requirements }}
+      run: |
+        python -m pip install --upgrade pip
+        for f in $REQUIREMENTS; do args+=(-r "$f"); done
+        python -m pip install "${args[@]}"

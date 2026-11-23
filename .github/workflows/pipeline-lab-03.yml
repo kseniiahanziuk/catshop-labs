@@ -1,0 +1,38 @@
+name: pipeline-lab-03
+
+on:
+  push:
+    paths:
+      - "lab-03/**"
+      - "!lab-03/*.md"
+      - "!lab-03/published.txt"
+      - ".github/workflows/pipeline-lab-03.yml"
+      - ".github/workflows/_build-and-test.yml"
+      - ".github/actions/**"
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/_build-and-test.yml
+    with:
+      context: lab-03
+      python-version: "3.12"
+      image: ghcr.io/${{ github.repository_owner }}/catshop-lab-03
+      push: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+
+  report:
+    needs: build-and-test
+    runs-on: ubuntu-24.04
+    steps:
+      - name: What came back
+        env:
+          IMAGE: ${{ needs.build-and-test.outputs.image }}
+          DIGEST: ${{ needs.build-and-test.outputs.digest }}
+        run: |
+          test -n "$DIGEST" || { echo "::error::the reusable workflow returned no digest"; exit 1; }
+          echo "image:  $IMAGE"
+          echo "digest: $DIGEST"
+          echo "Published \`$IMAGE@$DIGEST\`" >> "$GITHUB_STEP_SUMMARY"
