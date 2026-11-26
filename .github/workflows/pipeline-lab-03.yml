@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - "lab-03/**"
+      # adding comment so pipeline runs again instead of rerun
       - "!lab-03/*.md"
       - "!lab-03/published.txt"
       - ".github/workflows/pipeline-lab-03.yml"
