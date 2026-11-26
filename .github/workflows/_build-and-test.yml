@@ -72,3 +72,65 @@ jobs:
           labels: org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha,scope=${{ inputs.context }}
           cache-to: type=gha,mode=max,scope=${{ inputs.context }}
+
+  # The image is pulled by the digest the build job produced, 
+  # so QA can never pick up a different image pushed in between.
+  # This job lives in this file and not in a separate one, so the test runner is still
+  # invoked from a single workflow file.
+  qa:
+    needs: build
+    if: inputs.push
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+    env:
+      QA_IMAGE: ${{ inputs.image }}@${{ needs.build.outputs.digest }}
+      COMPOSE_FILE: ${{ inputs.context }}/qa/compose.qa.yaml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-py${{ inputs.python-version }}-${{ hashFiles(format('{0}/requirements*.txt', inputs.context)) }}
+          restore-keys: |
+            pip-${{ runner.os }}-py${{ inputs.python-version }}-
+      - uses: ./.github/actions/python-env
+        with:
+          python-version: ${{ inputs.python-version }}
+          working-directory: ${{ inputs.context }}
+          requirements: requirements.txt requirements-dev.txt
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull the published image
+        run: docker pull "$QA_IMAGE"
+      - name: Stand up the QA stack
+        run: docker compose -f "$COMPOSE_FILE" up -d --wait
+      - name: Run the QA suite
+        run: python -m pytest ${{ inputs.context }}/qa -q
+      - name: Stack logs
+        if: failure()
+        run: docker compose -f "$COMPOSE_FILE" logs
+      - name: Tear down the QA stack
+        if: always()
+        run: docker compose -f "$COMPOSE_FILE" down -v
+
+  # Reachable only through QA: if qa fails or is skipped, nothing is recorded.
+  record:
+    needs: [build, qa]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Write published.txt
+        env:
+          REF: ${{ inputs.image }}@${{ needs.build.outputs.digest }}
+        run: |
+          mkdir -p "${{ inputs.context }}"
+          echo "$REF" > "${{ inputs.context }}/published.txt"
+          echo "Passed QA and recorded: \`$REF\`" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: published
+          path: ${{ inputs.context }}/published.txt
