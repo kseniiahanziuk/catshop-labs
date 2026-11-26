@@ -35,6 +35,12 @@ jobs:
         working-directory: ${{ inputs.context }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-py${{ inputs.python-version }}-${{ hashFiles(format('{0}/requirements*.txt', inputs.context)) }}
+          restore-keys: |
+            pip-${{ runner.os }}-py${{ inputs.python-version }}-
       - uses: ./.github/actions/python-env
         with:
           python-version: ${{ inputs.python-version }}
@@ -56,6 +62,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
       - id: build
         uses: docker/build-push-action@v6
         with:
@@ -63,3 +70,5 @@ jobs:
           push: ${{ inputs.push }}
           tags: ${{ inputs.image }}:${{ github.sha }}
           labels: org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=${{ inputs.context }}
+          cache-to: type=gha,mode=max,scope=${{ inputs.context }}

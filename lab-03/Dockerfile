@@ -3,8 +3,10 @@ FROM python:3.12-slim-bookworm
 RUN useradd --uid 10001 app && mkdir /data && chown app /data
 
 WORKDIR /app
-COPY app.py requirements.txt ./
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app.py .
 
 ENV PYTHONUNBUFFERED=1 COUNTER_FILE=/data/visits.txt PORT=8080
 
